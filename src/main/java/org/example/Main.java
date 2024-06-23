@@ -233,68 +233,46 @@ public class Main {
         int titleWidth = fm.stringWidth("TOP TRENDING COINS");
         g2d.drawString("TOP TRENDING COINS", (width - titleWidth) / 2, 40);
 
-        // Coinleri kategorilere göre listele
-        // Coinleri kategorilere göre listele
+        // Coinleri listele
         g2d.setFont(new Font("Arial", Font.PLAIN, 18));
         int yPosition = 80;
-        Map<String, List<JSONObject>> categories = new HashMap<>();
-
-        // Coinleri kategorilere göre grupla
         for (int i = 0; i < trendingCoins.length(); i++) {
             JSONObject coin = trendingCoins.getJSONObject(i).getJSONObject("item");
-            String category = coin.optString("category", "Other");
-            categories.putIfAbsent(category, new ArrayList<>());
-            categories.get(category).add(coin);
-        }
+            String coinName = coin.getString("name");
+            String coinSymbol = coin.getString("symbol");
 
-        for (Map.Entry<String, List<JSONObject>> entry : categories.entrySet()) {
-            List<JSONObject> coinsInCategory = entry.getValue();
-
-            // Çerçeve çiz
-            g2d.setColor(Color.LIGHT_GRAY);
-            g2d.fillRect(20, yPosition, width - 40, (coinsInCategory.size() * boxHeight) + padding);
-            g2d.setColor(Color.BLACK);
-            g2d.drawRect(20, yPosition, width - 40, (coinsInCategory.size() * boxHeight) + padding);
-            yPosition += padding;
-
-            for (JSONObject coin : coinsInCategory) {
-                String coinName = coin.getString("name");
-                String coinSymbol = coin.getString("symbol");
-
-                JSONObject coinDetails = getCoinDetails(coin.getString("id"));
-                if (coinDetails == null) {
-                    continue;
-                }
-
-                double priceChangePercentage24h = coinDetails
-                        .getJSONObject("market_data")
-                        .optDouble("price_change_percentage_24h", 0.0);
-
-                String imageUrl = coinDetails.optJSONObject("image").optString("large", ""); // Check if image key exists
-
-                String hypeIndicator = hypeCoins.contains(coinName) ? " (HYPE)" : "";
-                String coinInfo = String.format("%s (%s)%s - 24h Change: %.2f%%", coinName, coinSymbol, hypeIndicator, priceChangePercentage24h);
-
-                // Coin ismi ve fiyat değişimini yaz
-                g2d.drawString(coinInfo, 100, yPosition + 40);
-
-                // Coin imajını ekle
-                BufferedImage coinImage = null;
-                if (!imageUrl.isEmpty()) {
-                    try {
-                        URL imageURL = new URL(imageUrl);
-                        coinImage = ImageIO.read(imageURL);
-                        if (coinImage != null) {
-                            g2d.drawImage(coinImage, 30, yPosition + 10, 60, 60, null);
-                        }
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-
-                yPosition += boxHeight;
+            JSONObject coinDetails = getCoinDetails(coin.getString("id"));
+            if (coinDetails == null) {
+                continue;
             }
-            yPosition += padding; // Çerçeveler arasında boşluk bırak
+
+            double priceChangePercentage24h = coinDetails
+                    .getJSONObject("market_data")
+                    .optDouble("price_change_percentage_24h", 0.0);
+
+            String imageUrl = coinDetails.optJSONObject("image").optString("large", ""); // Check if image key exists
+
+            String hypeIndicator = hypeCoins.contains(coinName) ? " (HYPE)" : "";
+            String coinInfo = String.format("%s (%s)%s - 24h Change: %.2f%%", coinName, coinSymbol, hypeIndicator, priceChangePercentage24h);
+
+            // Coin ismi ve fiyat değişimini yaz
+            g2d.drawString(coinInfo, 100, yPosition + 40);
+
+            // Coin imajını ekle
+            BufferedImage coinImage = null;
+            if (!imageUrl.isEmpty()) {
+                try {
+                    URL imageURL = new URL(imageUrl);
+                    coinImage = ImageIO.read(imageURL);
+                    if (coinImage != null) {
+                        g2d.drawImage(coinImage, 30, yPosition + 10, 60, 60, null);
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            yPosition += boxHeight;
         }
 
         g2d.dispose();
