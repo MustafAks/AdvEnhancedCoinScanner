@@ -8,10 +8,25 @@
     <artifactId>EnhancedCoinScanner2</artifactId>
     <version>1.0-SNAPSHOT</version>
 
+    <dependencies>
+        <!-- JSON processing library -->
+        <dependency>
+            <groupId>org.json</groupId>
+            <artifactId>json</artifactId>
+            <version>20210307</version>
+        </dependency>
+        <dependency>
+            <groupId>org.twitter4j</groupId>
+            <artifactId>twitter4j-core</artifactId>
+            <version>4.0.7</version>
+        </dependency>
+
+        <!-- Add other dependencies here if needed -->
+    </dependencies>
     <properties>
         <maven.compiler.source>22</maven.compiler.source>
         <maven.compiler.target>22</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
-    
+
 </project>
