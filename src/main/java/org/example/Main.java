@@ -10,11 +10,8 @@ import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class Main {
 
@@ -37,7 +34,12 @@ public class Main {
                     sendHypeNotification(botToken, chatId, hypeCoins, trendingCoins);
                 }
 
+                // Önemli gelişmeleri al
+                JSONArray marketNews = getMarketNews();
+                sendMarketNews(botToken, chatId, marketNews);
+
                 // 1 saat bekle
+                System.out.println("Waiting for 1 hour before next execution...");
                 Thread.sleep(3600000);
 
             } catch (Exception e) {
@@ -206,9 +208,158 @@ public class Main {
                     }
                 }
             }
+
+            // Metin mesajı gönder
+            sendTextMessage(botToken, chatId, trendingCoins);
+
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public static void sendTextMessage(String botToken, long chatId, JSONArray trendingCoins) {
+        try {
+            StringBuilder message = new StringBuilder();
+            for (int i = 0; i < trendingCoins.length(); i++) {
+                JSONObject coin = trendingCoins.getJSONObject(i).getJSONObject("item");
+                message.append("$").append(coin.getString("name")).append(" ");
+            }
+            // Etiketler ekle
+            message.append("\n$crypto $cryptocurrency $bitcoin $blockchain $altcoin $trendcoins");
+
+            String urlString = "https://api.telegram.org/bot" + botToken + "/sendMessage";
+            URL url = new URL(urlString);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "application/json");
+
+            JSONObject jsonMessage = new JSONObject();
+            jsonMessage.put("chat_id", chatId);
+            jsonMessage.put("text", message.toString());
+
+            try (OutputStream outputStream = connection.getOutputStream()) {
+                byte[] input = jsonMessage.toString().getBytes("utf-8");
+                outputStream.write(input, 0, input.length);
+            }
+
+            int responseCode = connection.getResponseCode();
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                System.out.println("Text message sent successfully.");
+            } else {
+                System.err.println("Error sending text message to Telegram. Response code: " + responseCode);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static JSONArray getMarketNews() {
+        String urlString = "https://api.coingecko.com/api/v3/news";
+        int retries = 5;  // Retry 5 times in case of a 429 error
+        int sleepTime = RATE_LIMIT_SLEEP_TIME_MS;
+
+        while (retries > 0) {
+            try {
+                URL url = new URL(urlString);
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("GET");
+
+                int responseCode = connection.getResponseCode();
+                if (responseCode == 429) {
+                    System.out.println("Rate limit exceeded. Waiting before retrying...");
+                    Thread.sleep(sleepTime);  // Wait before retrying
+                    retries--;
+                    sleepTime *= 2;  // Increase sleep time exponentially
+                    continue;
+                } else if (responseCode != 200) {
+                    System.err.println("Failed to fetch market news. Response Code: " + responseCode);
+                    return null;
+                }
+
+                BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                StringBuilder response = new StringBuilder();
+                String line;
+
+                while ((line = reader.readLine()) != null) {
+                    response.append(line);
+                }
+                reader.close();
+
+                JSONObject jsonResponse = new JSONObject(response.toString());
+                return jsonResponse.getJSONArray("data");
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                retries--;
+                sleepTime *= 2;  // Increase sleep time exponentially
+                if (retries == 0) {
+                    System.err.println("Failed to fetch market news after retries.");
+                    return null;
+                }
+            }
+        }
+        return null;
+    }
+
+    public static void sendMarketNews(String botToken, long chatId, JSONArray news) {
+        if (news == null) {
+            System.err.println("No market news to send.");
+            return;
+        }
+
+        try {
+            for (int i = 0; i < news.length(); i++) {
+                JSONObject newsItem = news.getJSONObject(i);
+                String title = newsItem.getString("title");
+                String url = newsItem.getString("url");
+
+                // Homer Simpson tarzında başlık
+                String homerStyleTitle = convertToHomerStyle(title);
+
+                String message = homerStyleTitle + "\n" + url + "\nMmm... donuts!";
+                if (message.length() > 280) {
+                    message = message.substring(0, 277) + "...";
+                }
+
+                sendSingleNewsMessage(botToken, chatId, message);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void sendSingleNewsMessage(String botToken, long chatId, String message) {
+        try {
+            String urlString = "https://api.telegram.org/bot" + botToken + "/sendMessage";
+            URL url = new URL(urlString);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "application/json");
+
+            JSONObject jsonMessage = new JSONObject();
+            jsonMessage.put("chat_id", chatId);
+            jsonMessage.put("text", message);
+
+            try (OutputStream outputStream = connection.getOutputStream()) {
+                byte[] input = jsonMessage.toString().getBytes("utf-8");
+                outputStream.write(input, 0, input.length);
+            }
+
+            int responseCode = connection.getResponseCode();
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                System.out.println("News message sent successfully.");
+            } else {
+                System.err.println("Error sending news message to Telegram. Response code: " + responseCode);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static String convertToHomerStyle(String title) {
+        return title.toUpperCase() + " D'OH!";
     }
 
     private static BufferedImage createImage(JSONArray trendingCoins, List<String> hypeCoins) {
