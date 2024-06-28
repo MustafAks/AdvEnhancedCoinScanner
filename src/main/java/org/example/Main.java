@@ -45,8 +45,8 @@ public class Main {
                 sendMarketNews(botToken, chatId, marketNews);
 
                 // 1 saat bekle
-                System.out.println("Waiting for 1 hour before next execution...");
-                Thread.sleep(3600000);
+                System.out.println("Waiting for 2 hour before next execution...");
+                Thread.sleep(7200000);
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -81,24 +81,47 @@ public class Main {
 
     public static JSONArray getTopCoins() {
         String urlString = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1";
-        try {
-            URL url = new URL(urlString);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
+        int retries = 5; // Retry 5 times in case of a 429 error
+        int sleepTime = RATE_LIMIT_SLEEP_TIME_MS;
 
-            BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-            StringBuilder response = new StringBuilder();
-            String line;
+        while (retries > 0) {
+            try {
+                URL url = new URL(urlString);
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("GET");
 
-            while ((line = reader.readLine()) != null) {
-                response.append(line);
+                int responseCode = connection.getResponseCode();
+                if (responseCode == 429) {
+                    System.out.println("Rate limit exceeded. Waiting before retrying...");
+                    Thread.sleep(sleepTime); // Wait before retrying
+                    retries--;
+                    sleepTime *= 2; // Increase sleep time exponentially
+                    continue;
+                } else if (responseCode != 200) {
+                    System.err.println("Failed to fetch top coins. Response Code: " + responseCode);
+                    return null;
+                }
+
+                BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                StringBuilder response = new StringBuilder();
+                String line;
+
+                while ((line = reader.readLine()) != null) {
+                    response.append(line);
+                }
+                reader.close();
+
+                return new JSONArray(response.toString());
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                retries--;
+                sleepTime *= 2; // Increase sleep time exponentially
+                if (retries == 0) {
+                    System.err.println("Failed to fetch top coins.");
+                    return null; // Return null if all retries fail
+                }
             }
-            reader.close();
-
-            return new JSONArray(response.toString());
-
-        } catch (Exception e) {
-            e.printStackTrace();
         }
         return null;
     }
