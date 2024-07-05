@@ -40,12 +40,8 @@ public class Main {
                 JSONArray topLosers = getTopLosers(topCoins);
                 sendTopGainersAndLosers(botToken, chatId, topGainers, topLosers);
 
-                // Önemli gelişmeleri al
-                JSONArray marketNews = getMarketNews();
-                sendMarketNews(botToken, chatId, marketNews);
-
                 // 1 saat bekle
-                System.out.println("Waiting for 2 hour before next execution...");
+                System.out.println("Waiting for 2 hours before next execution...");
                 Thread.sleep(7200000);
 
             } catch (Exception e) {
@@ -390,86 +386,6 @@ public class Main {
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    public static JSONArray getMarketNews() {
-        String urlString = "https://api.coingecko.com/api/v3/news";
-        try {
-            URL url = new URL(urlString);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-
-            BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-            StringBuilder response = new StringBuilder();
-            String line;
-
-            while ((line = reader.readLine()) != null) {
-                response.append(line);
-            }
-            reader.close();
-
-            JSONObject jsonResponse = new JSONObject(response.toString());
-            return jsonResponse.getJSONArray("data");
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-    public static void sendMarketNews(String botToken, long chatId, JSONArray news) {
-        try {
-            for (int i = 0; i < news.length(); i++) {
-                JSONObject newsItem = news.getJSONObject(i);
-                String title = newsItem.getString("title");
-                String url = newsItem.getString("url");
-
-                // Homer Simpson tarzında başlık
-                String homerStyleTitle = convertToHomerStyle(title);
-
-                String message = homerStyleTitle + "\n" + url;
-                if (message.length() > 280) {
-                    message = message.substring(0, 277) + "...";
-                }
-
-                sendSingleNewsMessage(botToken, chatId, message);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    public static void sendSingleNewsMessage(String botToken, long chatId, String message) {
-        try {
-            String urlString = "https://api.telegram.org/bot" + botToken + "/sendMessage";
-            URL url = new URL(urlString);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("POST");
-            connection.setDoOutput(true);
-            connection.setRequestProperty("Content-Type", "application/json");
-
-            JSONObject jsonMessage = new JSONObject();
-            jsonMessage.put("chat_id", chatId);
-            jsonMessage.put("text", message);
-
-            try (OutputStream outputStream = connection.getOutputStream()) {
-                byte[] input = jsonMessage.toString().getBytes("utf-8");
-                outputStream.write(input, 0, input.length);
-            }
-
-            int responseCode = connection.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-                System.out.println("News message sent successfully.");
-            } else {
-                System.err.println("Error sending news message to Telegram. Response code: " + responseCode);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private static String convertToHomerStyle(String title) {
-        return title.toUpperCase() + " D'OH!";
     }
 
     public static void sendTextMessageGainersAndLosers(String botToken, long chatId, JSONArray topGainers, JSONArray topLosers) {
