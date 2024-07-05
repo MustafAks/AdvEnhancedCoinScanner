@@ -46,7 +46,13 @@ public class Main {
                 JSONArray topLosers = getTopLosers(topCoins);
                 sendTopGainersAndLosers(botToken, chatId, topGainers, topLosers);
 
-                // 1 saat bekle
+                // Günlük piyasa özeti
+                sendDailyMarketSummary(botToken, chatId, topGainers, topLosers, topCoins);
+
+                // Haftalık piyasa özeti
+                sendWeeklyMarketSummary(botToken, chatId);
+
+                // 2 saat bekle
                 System.out.println("Waiting for 2 hours before next execution...");
                 Thread.sleep(7200000);
 
@@ -433,6 +439,273 @@ public class Main {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public static void sendDailyMarketSummary(String botToken, long chatId, JSONArray topGainers, JSONArray topLosers, JSONArray topCoins) {
+        try {
+            // Grafik oluştur
+            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+            for (int i = 0; i < topGainers.length(); i++) {
+                JSONObject gainer = topGainers.getJSONObject(i);
+                dataset.addValue(gainer.getDouble("price_change_percentage_24h"), "Gainers", gainer.getString("symbol"));
+            }
+            for (int i = 0; i < topLosers.length(); i++) {
+                JSONObject loser = topLosers.getJSONObject(i);
+                dataset.addValue(loser.getDouble("price_change_percentage_24h"), "Losers", loser.getString("symbol"));
+            }
+
+            JFreeChart barChart = ChartFactory.createBarChart(
+                    "Daily Market Summary",
+                    "Coin",
+                    "24h % Change",
+                    dataset,
+                    PlotOrientation.VERTICAL,
+                    true, true, false);
+
+            int width = 800;
+            int height = 600;
+            File barChartFile = new File("DailyMarketSummary.jpeg");
+            ChartUtils.saveChartAsJPEG(barChartFile, barChart, width, height);
+
+            // Telegram API'sine grafik gönder
+            String urlString = "https://api.telegram.org/bot" + botToken + "/sendPhoto";
+            String boundary = "----WebKitFormBoundary" + System.currentTimeMillis();
+            URL url = new URL(urlString);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+
+            try (OutputStream outputStream = connection.getOutputStream();
+                 PrintWriter writer = new PrintWriter(new OutputStreamWriter(outputStream, "UTF-8"), true)) {
+
+                // Add chat_id
+                writer.append("--").append(boundary).append("\r\n");
+                writer.append("Content-Disposition: form-data; name=\"chat_id\"\r\n\r\n");
+                writer.append(String.valueOf(chatId)).append("\r\n");
+
+                // Add caption
+                writer.append("--").append(boundary).append("\r\n");
+                writer.append("Content-Disposition: form-data; name=\"caption\"\r\n\r\n");
+                writer.append("Daily Market Summary\r\n");
+
+                // Add photo
+                writer.append("--").append(boundary).append("\r\n");
+                writer.append("Content-Disposition: form-data; name=\"photo\"; filename=\"DailyMarketSummary.jpeg\"\r\n");
+                writer.append("Content-Type: image/jpeg\r\n\r\n");
+                writer.flush();
+
+                Files.copy(barChartFile.toPath(), outputStream);
+                outputStream.flush();
+
+                writer.append("\r\n");
+                writer.append("--").append(boundary).append("--\r\n");
+                writer.flush();
+            }
+
+            int responseCode = connection.getResponseCode();
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                System.out.println("Daily market summary sent successfully.");
+            } else {
+                System.err.println("Error sending daily market summary to Telegram. Response code: " + responseCode);
+                // Hata durumunda, sunucudan gelen hatayı okumak
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getErrorStream()))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        System.err.println(line);
+                    }
+                }
+            }
+
+            // Metin mesajı gönder
+            sendTextMessageDailySummary(botToken, chatId, topCoins);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void sendWeeklyMarketSummary(String botToken, long chatId) {
+        // Haftalık özet verilerini çek
+        JSONArray topCoinsWeekly = getWeeklyTopCoins();
+        JSONArray topGainersWeekly = getTopGainers(topCoinsWeekly);
+        JSONArray topLosersWeekly = getTopLosers(topCoinsWeekly);
+
+        try {
+            // Grafik oluştur
+            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+            for (int i = 0; i < topGainersWeekly.length(); i++) {
+                JSONObject gainer = topGainersWeekly.getJSONObject(i);
+                dataset.addValue(gainer.getDouble("price_change_percentage_24h"), "Gainers", gainer.getString("symbol"));
+            }
+            for (int i = 0; i < topLosersWeekly.length(); i++) {
+                JSONObject loser = topLosersWeekly.getJSONObject(i);
+                dataset.addValue(loser.getDouble("price_change_percentage_24h"), "Losers", loser.getString("symbol"));
+            }
+
+            JFreeChart barChart = ChartFactory.createBarChart(
+                    "Weekly Market Summary",
+                    "Coin",
+                    "24h % Change",
+                    dataset,
+                    PlotOrientation.VERTICAL,
+                    true, true, false);
+
+            int width = 800;
+            int height = 600;
+            File barChartFile = new File("WeeklyMarketSummary.jpeg");
+            ChartUtils.saveChartAsJPEG(barChartFile, barChart, width, height);
+
+            // Telegram API'sine grafik gönder
+            String urlString = "https://api.telegram.org/bot" + botToken + "/sendPhoto";
+            String boundary = "----WebKitFormBoundary" + System.currentTimeMillis();
+            URL url = new URL(urlString);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+
+            try (OutputStream outputStream = connection.getOutputStream();
+                 PrintWriter writer = new PrintWriter(new OutputStreamWriter(outputStream, "UTF-8"), true)) {
+
+                // Add chat_id
+                writer.append("--").append(boundary).append("\r\n");
+                writer.append("Content-Disposition: form-data; name=\"chat_id\"\r\n\r\n");
+                writer.append(String.valueOf(chatId)).append("\r\n");
+
+                // Add caption
+                writer.append("--").append(boundary).append("\r\n");
+                writer.append("Content-Disposition: form-data; name=\"caption\"\r\n\r\n");
+                writer.append("Weekly Market Summary\r\n");
+
+                // Add photo
+                writer.append("--").append(boundary).append("\r\n");
+                writer.append("Content-Disposition: form-data; name=\"photo\"; filename=\"WeeklyMarketSummary.jpeg\"\r\n");
+                writer.append("Content-Type: image/jpeg\r\n\r\n");
+                writer.flush();
+
+                Files.copy(barChartFile.toPath(), outputStream);
+                outputStream.flush();
+
+                writer.append("\r\n");
+                writer.append("--").append(boundary).append("--\r\n");
+                writer.flush();
+            }
+
+            int responseCode = connection.getResponseCode();
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                System.out.println("Weekly market summary sent successfully.");
+            } else {
+                System.err.println("Error sending weekly market summary to Telegram. Response code: " + responseCode);
+                // Hata durumunda, sunucudan gelen hatayı okumak
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getErrorStream()))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        System.err.println(line);
+                    }
+                }
+            }
+
+            // Metin mesajı gönder
+            sendTextMessageWeeklySummary(botToken, chatId, topCoinsWeekly);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void sendTextMessageDailySummary(String botToken, long chatId, JSONArray topCoins) {
+        try {
+            StringBuilder message = new StringBuilder();
+            message.append("Daily Market Summary:\n");
+            message.append("Top Gainers:\n");
+            JSONArray topGainers = getTopGainers(topCoins);
+            for (int i = 0; i < topGainers.length(); i++) {
+                JSONObject gainer = topGainers.getJSONObject(i);
+                message.append("$").append(gainer.getString("symbol")).append(": ").append(gainer.getDouble("price_change_percentage_24h")).append("%\n");
+            }
+            message.append("Top Losers:\n");
+            JSONArray topLosers = getTopLosers(topCoins);
+            for (int i = 0; i < topLosers.length(); i++) {
+                JSONObject loser = topLosers.getJSONObject(i);
+                message.append("$").append(loser.getString("symbol")).append(": ").append(loser.getDouble("price_change_percentage_24h")).append("%\n");
+            }
+
+            String urlString = "https://api.telegram.org/bot" + botToken + "/sendMessage";
+            URL url = new URL(urlString);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "application/json");
+
+            JSONObject jsonMessage = new JSONObject();
+            jsonMessage.put("chat_id", chatId);
+            jsonMessage.put("text", message.toString());
+
+            try (OutputStream outputStream = connection.getOutputStream()) {
+                byte[] input = jsonMessage.toString().getBytes("utf-8");
+                outputStream.write(input, 0, input.length);
+            }
+
+            int responseCode = connection.getResponseCode();
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                System.out.println("Daily summary text message sent successfully.");
+            } else {
+                System.err.println("Error sending daily summary text message to Telegram. Response code: " + responseCode);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void sendTextMessageWeeklySummary(String botToken, long chatId, JSONArray topCoins) {
+        try {
+            StringBuilder message = new StringBuilder();
+            message.append("Weekly Market Summary:\n");
+            message.append("Top Gainers:\n");
+            JSONArray topGainers = getTopGainers(topCoins);
+            for (int i = 0; i < topGainers.length(); i++) {
+                JSONObject gainer = topGainers.getJSONObject(i);
+                message.append("$").append(gainer.getString("symbol")).append(": ").append(gainer.getDouble("price_change_percentage_24h")).append("%\n");
+            }
+            message.append("Top Losers:\n");
+            JSONArray topLosers = getTopLosers(topCoins);
+            for (int i = 0; i < topLosers.length(); i++) {
+                JSONObject loser = topLosers.getJSONObject(i);
+                message.append("$").append(loser.getString("symbol")).append(": ").append(loser.getDouble("price_change_percentage_24h")).append("%\n");
+            }
+
+            String urlString = "https://api.telegram.org/bot" + botToken + "/sendMessage";
+            URL url = new URL(urlString);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "application/json");
+
+            JSONObject jsonMessage = new JSONObject();
+            jsonMessage.put("chat_id", chatId);
+            jsonMessage.put("text", message.toString());
+
+            try (OutputStream outputStream = connection.getOutputStream()) {
+                byte[] input = jsonMessage.toString().getBytes("utf-8");
+                outputStream.write(input, 0, input.length);
+            }
+
+            int responseCode = connection.getResponseCode();
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                System.out.println("Weekly summary text message sent successfully.");
+            } else {
+                System.err.println("Error sending weekly summary text message to Telegram. Response code: " + responseCode);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static JSONArray getWeeklyTopCoins() {
+        // Haftalık veri çekmek için bir metot ekleyebiliriz. Örneğin, son 7 günlük veri çekmek için CoinGecko API'sini kullanabilirsiniz.
+        // Bu örnek, günlük veriyi kullanarak haftalık veriyi simüle etmekte. Gerçek veri kaynağına göre güncellenmesi gerekecek.
+        return getTopCoins();
     }
 
     private static BufferedImage createImage(JSONArray trendingCoins, List<String> hypeCoins, String title) {
