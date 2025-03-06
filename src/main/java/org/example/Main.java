@@ -42,7 +42,7 @@ public class Main {
 
                 // 2 saat bekle
                 System.out.println("Waiting for 2 hours before next execution...");
-                Thread.sleep(28800000); // 8 saat bekler
+                Thread.sleep(3600000);
 
             } catch (Exception e) {
                 e.printStackTrace();
